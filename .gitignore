@@ -1,0 +1,26 @@
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# Python / backend
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Cloned repositories analyzed by RepoMind (runtime data, not source)
+backend/repository_store/*
+!backend/repository_store/.gitkeep
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
