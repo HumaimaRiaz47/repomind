@@ -3,6 +3,27 @@ import os
 from app.ingestion.scanner import scan_repository
 from app.ingestion.ast_analyzer import analyze_python_file
 
+# Maximum number of source lines included per file in the context.
+# Keeps prompt size manageable for local models.
+_SOURCE_LINE_LIMIT = 150
+
+
+def _read_source(file_path: str, line_limit: int = _SOURCE_LINE_LIMIT) -> str:
+    """
+    Read up to `line_limit` lines of source code from a file.
+    Returns an empty string on any read error.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+        truncated = lines[:line_limit]
+        result = "".join(truncated)
+        if len(lines) > line_limit:
+            result += f"\n... (truncated — {len(lines) - line_limit} more lines)"
+        return result
+    except OSError:
+        return ""
+
 
 def build_repository_context(repository_path: str) -> dict:
     """
@@ -13,6 +34,7 @@ def build_repository_context(repository_path: str) -> dict:
     - Source files
     - Test files
     - AST information for Python source files
+    - Source code (up to _SOURCE_LINE_LIMIT lines) per file
     """
 
     scan_result = scan_repository(repository_path)
@@ -36,12 +58,15 @@ def build_repository_context(repository_path: str) -> dict:
             relative_path
         )
 
+        source_code = _read_source(file_path)
+
         try:
             ast_data = analyze_python_file(file_path)
 
             files_context.append({
                 "path": relative_path,
                 "type": "python_source",
+                "source_code": source_code,
                 "analysis": ast_data
             })
 
@@ -50,6 +75,7 @@ def build_repository_context(repository_path: str) -> dict:
             files_context.append({
                 "path": relative_path,
                 "type": "python_source",
+                "source_code": source_code,
                 "analysis_error": str(error)
             })
 

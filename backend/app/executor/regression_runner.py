@@ -2,6 +2,8 @@ import subprocess
 import sys
 from typing import Dict, Any
 
+from app.executor.test_runner import _build_env
+
 
 def run_regression_tests(
     repository_path: str
@@ -13,32 +15,27 @@ def run_regression_tests(
 
     try:
 
+        env = _build_env(repository_path)
+
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "-q"
-            ],
+            [sys.executable, "-m", "pytest", "-q", "--tb=short"],
             cwd=repository_path,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
+            env=env,
         )
 
         if result.returncode == 0:
-
             status = "passed"
-
         else:
-
             status = "failed"
 
         return {
             "status": status,
             "return_code": result.returncode,
             "stdout": result.stdout,
-            "stderr": result.stderr
+            "stderr": result.stderr,
         }
 
     except subprocess.TimeoutExpired:
@@ -47,7 +44,7 @@ def run_regression_tests(
             "status": "timeout",
             "return_code": None,
             "stdout": "",
-            "stderr": "Regression test suite timed out."
+            "stderr": "Regression test suite timed out.",
         }
 
     except Exception as e:
@@ -56,5 +53,5 @@ def run_regression_tests(
             "status": "error",
             "return_code": None,
             "stdout": "",
-            "stderr": str(e)
+            "stderr": str(e),
         }

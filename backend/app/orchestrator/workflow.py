@@ -69,7 +69,10 @@ def run_repomind_workflow(
         fix = generate_fix(
             finding,
             validation,
-            context
+            context,
+            test=test,
+            execution=execution,
+            repository_path=repository_path,
         )
 
         results.append({
