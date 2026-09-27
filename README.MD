@@ -72,14 +72,7 @@ This makes execution a central part of the AI software-engineering loop.
 
 # 🏗️ System Architecture
 
-<!-- FLOWCHART PLACEHOLDER -->
 
-> **📌 Architecture / Flowchart**
->
-> Add the RepoMind system architecture or workflow diagram here.
->
-> Suggested file:
->
  ![RepoMind Architecture](docs/repomind.png)
 
 
@@ -549,6 +542,18 @@ RepoMind was developed as a software-engineering workflow powered by AI-assisted
 
 > **Execution-based validation of AI-generated software-engineering hypotheses.**
 
+### Bob Sessions
+
+> **Bob IDE**
+
+![BOB IDE IMAGE](bob_sessions/bob_ide.png)
+
+
+> **Bobcoins Usage**
+
+![BOB COIN USAGE](bob_sessions/bob_usage.png)
+
+
 ---
 
 # 👩‍💻 Team
@@ -563,4 +568,3 @@ AI/ML Engineer
 
 This project is developed for the IBM Bob 2.0 Hackathon.
 
-````
