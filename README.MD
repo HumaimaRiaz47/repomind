@@ -80,14 +80,14 @@ This makes execution a central part of the AI software-engineering loop.
 >
 > Suggested file:
 >
-> `docs/repomind.png`
+ ![RepoMind Architecture](docs/repomind.svg)
 
 
 ---
 
 # 🔄 Workflow
 
-> `docs/system_design.svg`
+ ![RepoMind Architecture](docs/system_design.svg)
 
 ---
 
