@@ -196,7 +196,6 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 ## Dashboard
 
-> **📸 Add screenshot here**
 >
 ![RepoMind Dashboard](docs/UI/1.png)
 
@@ -205,7 +204,6 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 ## Repository Analysis
 
-> **📸 Add screenshot here**
 >
 ![Repository Analysis](docs/UI/2.png)
 
@@ -213,7 +211,6 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 ## Test Evidence
 
-> **📸 Add screenshot here**
 >
 ![Test Evidence](docs/UI/3.png)
 ![Test Evidence](docs/UI/4.png)
@@ -224,7 +221,6 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 ## Fix & Regression Testing
 
-> **📸 Add screenshot here**
 >
 ![Fix Agent](docs/UI/5.png)
 ![Fix Agent](docs/UI/6.png)
@@ -235,7 +231,6 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 ## Final Report
 
-> **📸 Add screenshot here**
 >
 ![Final Report](docs/UI/7.png)
 ---
