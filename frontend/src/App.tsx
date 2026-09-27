@@ -14,6 +14,7 @@ function App() {
     repoUrl,
     stages,
     report,
+    analysisError,
     selectedFinding,
     evidence,
     evidenceLoading,
@@ -37,7 +38,17 @@ function App() {
       <Stepper current={step} />
 
       <main className="px-4 pb-16 pt-8">
-        {step === 'input' && <RepositoryInput onSubmit={startAnalysis} isSubmitting={false} />}
+        {step === 'input' && (
+          <>
+            <RepositoryInput onSubmit={startAnalysis} isSubmitting={false} />
+            {analysisError && (
+              <div className="mx-auto mt-4 w-full max-w-xl rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+                <span className="font-semibold">Analysis failed: </span>
+                {analysisError}
+              </div>
+            )}
+          </>
+        )}
 
         {step === 'progress' && (
           <AnalysisProgress repoUrl={repoUrl} repo={report?.repo ?? null} stages={stages} />

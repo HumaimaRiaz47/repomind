@@ -4,7 +4,7 @@ Tests for the test execution + validation integration loop.
 Coverage:
 1. _build_env() — unit tests, no subprocess.
 2. run_test()   — unit tests with mocked subprocess.
-3. validate_finding() — unit tests for all four status branches.
+3. validate_finding() — unit tests for all status branches (incl. test_generation_error).
 4. Deterministic integration test using a tiny temporary Python
    repository with a deliberately reproducible bug, demonstrating
    the full:  hypothesis → test → execution → failure → validated
@@ -239,13 +239,13 @@ class TestValidateFinding(unittest.TestCase):
         )
         self.assertEqual(result["status"], "needs_review")
 
-    def test_error_gives_needs_review(self):
+    def test_error_gives_test_generation_error(self):
         """Infrastructure error must NOT confirm a bug hypothesis."""
         result = validate_finding(
             _minimal_finding(),
             {"status": "error", "return_code": 2, "stdout": "", "stderr": "ImportError"}
         )
-        self.assertEqual(result["status"], "needs_review")
+        self.assertEqual(result["status"], "test_generation_error")
 
     def test_validated_has_reason(self):
         result = validate_finding(
@@ -264,7 +264,7 @@ class TestValidateFinding(unittest.TestCase):
         self.assertIn("reason", result)
 
     def test_all_statuses_have_confidence(self):
-        for status in ("failed", "passed", "timeout", "error"):
+        for status in ("failed", "passed", "timeout", "error", "unknown_xyz"):
             with self.subTest(status=status):
                 result = validate_finding(
                     _minimal_finding(),
@@ -273,6 +273,52 @@ class TestValidateFinding(unittest.TestCase):
                 self.assertIn("confidence", result)
                 self.assertGreaterEqual(result["confidence"], 0.0)
                 self.assertLessEqual(result["confidence"], 1.0)
+
+    # ── Task 7B: test_generation_error ────────────────────────────────────────
+
+    def test_error_status_gives_test_generation_error(self):
+        """
+        execution.status == 'error' (pytest exit 2 = ImportError/NameError/
+        SyntaxError at collection time) must produce
+        validation.status == 'test_generation_error', NOT 'needs_review'.
+        """
+        result = validate_finding(
+            _minimal_finding(),
+            {"status": "error", "return_code": 2, "stdout": "", "stderr": "ImportError"}
+        )
+        self.assertEqual(result["status"], "test_generation_error")
+
+    def test_test_generation_error_has_reason(self):
+        result = validate_finding(
+            _minimal_finding(),
+            {"status": "error", "return_code": 2, "stdout": "", "stderr": ""}
+        )
+        self.assertIn("reason", result)
+        self.assertIsInstance(result["reason"], str)
+        self.assertGreater(len(result["reason"]), 0)
+
+    def test_test_generation_error_confidence_below_validated(self):
+        """test_generation_error confidence must be lower than validated confidence."""
+        error_result = validate_finding(
+            _minimal_finding(),
+            {"status": "error", "return_code": 2, "stdout": "", "stderr": ""}
+        )
+        validated_result = validate_finding(
+            _minimal_finding(),
+            {"status": "failed", "return_code": 1, "stdout": "", "stderr": ""}
+        )
+        self.assertLess(error_result["confidence"], validated_result["confidence"])
+
+    def test_test_generation_error_does_not_confirm_bug(self):
+        """
+        An 'error' execution result must never produce a 'validated' or
+        'rejected' status — both would represent false certainty.
+        """
+        result = validate_finding(
+            _minimal_finding(),
+            {"status": "error", "return_code": 2, "stdout": "", "stderr": "NameError"}
+        )
+        self.assertNotIn(result["status"], ("validated", "rejected"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -345,10 +391,11 @@ class TestExecutionValidationLoop(unittest.TestCase):
             validation = validate_finding(_minimal_finding(), execution)
             self.assertEqual(validation["status"], "rejected")
 
-    def test_import_error_produces_error_not_failed(self):
+    def test_import_error_produces_test_generation_error(self):
         """
         A test that fails to collect due to a missing import must produce
-        execution.status == 'error' (returncode 2), NOT 'failed' (returncode 1).
+        execution.status == 'error' (returncode 2), and then
+        validation.status == 'test_generation_error' — NOT 'needs_review'.
         This preserves the semantic: only returncode 1 = confirmed test failure.
         """
         with _TempRepo() as repo:
@@ -364,7 +411,7 @@ class TestExecutionValidationLoop(unittest.TestCase):
                              f"Expected 'error', got {execution['status']!r}")
 
             validation = validate_finding(_minimal_finding(), execution)
-            self.assertEqual(validation["status"], "needs_review",
+            self.assertEqual(validation["status"], "test_generation_error",
                              "An infrastructure error must not confirm a bug hypothesis.")
 
     def test_flat_layout_module_importable(self):

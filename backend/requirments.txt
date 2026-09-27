@@ -4,3 +4,4 @@ gitpython
 pydantic
 python-dotenv
 requests
+httpx

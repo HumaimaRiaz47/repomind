@@ -450,3 +450,103 @@ def run_repository_regression(
             status_code=400,
             detail=str(e)
         )
+
+# ---------------------------------------------------------------------------
+# /report — frontend-aligned analysis endpoint
+# ---------------------------------------------------------------------------
+
+@router.post("/report")
+def get_analysis_report(request: RepositoryRequest):
+    """
+    Run the full RepoMind workflow and return a response shaped to match
+    the frontend AnalysisReport type exactly.
+
+    Request:  { "repo_url": "https://github.com/owner/repo" }
+    Response: see AnalysisReport in frontend/src/types/index.ts
+    """
+
+    try:
+        # 1. Clone (or reuse) the repository
+        clone_result = clone_repository(request.repo_url)
+        repository_path = clone_result["repository_path"]
+
+        # 2. Run the full pipeline
+        workflow = run_repomind_workflow(repository_path)
+
+        # 3. Extract repo metadata from the workflow context
+        repo_meta_raw = workflow.get("repository_context", {}).get("repository", {})
+        repo_url = request.repo_url.rstrip("/")
+        url_parts = repo_url.split("/")
+        repo_name = url_parts[-1] if url_parts else "repository"
+        repo_owner = url_parts[-2] if len(url_parts) >= 2 else "unknown"
+
+        repo_meta = {
+            "url": request.repo_url,
+            "owner": repo_owner,
+            "name": repo_name,
+            "language": "Python",
+            "filesScanned": repo_meta_raw.get("source_file_count", 0),
+            "dependencies": len(repo_meta_raw.get("config_files", [])),
+        }
+
+        # 4. Map pipeline results → frontend Finding objects
+        findings_out = []
+        issues_validated = 0
+        issues_fixed = 0
+
+        for i, result_item in enumerate(workflow.get("results", [])):
+            finding = result_item.get("finding", {})
+            validation = result_item.get("validation", {})
+            fix = result_item.get("fix", {})
+
+            val_status = validation.get("status", "needs_review")
+            fix_status = fix.get("status", "not_applicable")
+
+            # Map validation status to frontend finding status
+            if fix_status == "fix_verified":
+                f_status = "fixed"
+                issues_fixed += 1
+                issues_validated += 1
+            elif val_status == "validated":
+                f_status = "validated"
+                issues_validated += 1
+            elif val_status == "rejected":
+                f_status = "rejected"
+            else:
+                f_status = "pending"
+
+            findings_out.append({
+                "id": f"finding_{i}",
+                "title": finding.get("title", "Untitled finding"),
+                "description": finding.get("reason", finding.get("hypothesis", "")),
+                "severity": finding.get("severity", "low"),
+                "file": finding.get("file") or "",
+                "line": 0,
+                "agent": "Bug Hunter Agent",
+                "status": f_status,
+                # Carry backend detail for evidence/fix views (not part of
+                # the core Finding interface but safely ignored by components
+                # that don't use it)
+                "_result": result_item,
+            })
+
+        tests_generated = workflow.get("tests", {}).get("test_count", 0)
+
+        import datetime
+        report = {
+            "repo": repo_meta,
+            "findings": findings_out,
+            "issuesFound": len(findings_out),
+            "issuesValidated": issues_validated,
+            "issuesFixed": issues_fixed,
+            "testsGenerated": tests_generated,
+            "generatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+
+        return report
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )

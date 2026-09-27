@@ -36,7 +36,7 @@ export interface TestEvidence {
   findingId: string
   testCode: string
   testFramework: 'pytest'
-  result: 'fail' | 'pass'
+  result: 'pass' | 'fail' | 'skipped' | 'error' | 'needs_review'
   output: string
   reasoning: string
 }
@@ -82,3 +82,56 @@ export type WizardStep =
   | 'evidence'
   | 'fix'
   | 'report'
+
+// ------------------------------------------------------------------
+// Backend result detail (attached to findings as _result by /report)
+// ------------------------------------------------------------------
+
+export interface BackendExecution {
+  status: 'passed' | 'failed' | 'error' | 'timeout' | 'skipped'
+  return_code: number | null
+  stdout: string
+  stderr: string
+}
+
+export interface BackendValidation {
+  status:
+    | 'validated'
+    | 'rejected'
+    | 'needs_review'
+    | 'test_generation_error'
+  confidence: number
+  reason: string
+}
+
+export interface BackendFix {
+  status: string
+  explanation?: string
+  original_code?: string | null
+  fixed_code?: string | null
+  diff?: string
+  requires_review?: boolean
+}
+
+export interface BackendTest {
+  test_name: string
+  test_code: string
+  finding_title?: string
+  file?: string
+  function?: string
+  hypothesis?: string
+  status?: string
+}
+
+export interface BackendResult {
+  finding: Record<string, unknown>
+  test: BackendTest
+  execution: BackendExecution
+  validation: BackendValidation
+  fix: BackendFix
+}
+
+/** Finding as returned by the /report endpoint — extends the base Finding */
+export interface BackendFinding extends Finding {
+  _result?: BackendResult
+}

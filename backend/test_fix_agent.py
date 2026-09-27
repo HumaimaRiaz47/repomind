@@ -774,6 +774,228 @@ class TestFixAgentOllamaIntegration(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task 7C — Fix Agent behavioral contract: test_generation_error
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestFixAgentBehavioralContract(unittest.TestCase):
+    """
+    Verifies the behavioral contract between the validation status and the
+    fix agent: findings whose validation status is anything other than
+    'validated' must NOT trigger a fix attempt.
+
+    This covers the test_generation_error path introduced by Task 7B.
+    """
+
+    def _validation(self, status):
+        return {"status": status, "confidence": 0.30, "reason": "test issue"}
+
+    def test_test_generation_error_returns_not_applicable(self):
+        """
+        A finding whose validation produced test_generation_error
+        (i.e. the generated test had an ImportError/NameError) must NOT
+        be passed to the AI for a fix — it is not confirmed as a real bug.
+        """
+        result = generate_fix(
+            _minimal_finding(),
+            self._validation("test_generation_error"),
+            _minimal_context(),
+        )
+        self.assertEqual(result["status"], "not_applicable",
+                         "test_generation_error must not trigger a fix attempt.")
+
+    def test_needs_review_returns_not_applicable(self):
+        result = generate_fix(
+            _minimal_finding(),
+            self._validation("needs_review"),
+            _minimal_context(),
+        )
+        self.assertEqual(result["status"], "not_applicable")
+
+    def test_rejected_returns_not_applicable(self):
+        result = generate_fix(
+            _minimal_finding(),
+            self._validation("rejected"),
+            _minimal_context(),
+        )
+        self.assertEqual(result["status"], "not_applicable")
+
+    def test_only_validated_triggers_ai(self):
+        """Only 'validated' status should cause the AI client to be called."""
+        with patch("app.agents.fix_agent.AIClient") as MockClient:
+            instance = MagicMock()
+            instance.generate.return_value = _good_fix_response()
+            MockClient.return_value = instance
+
+            # test_generation_error — AI must NOT be called
+            generate_fix(
+                _minimal_finding(),
+                self._validation("test_generation_error"),
+                _minimal_context(),
+            )
+            MockClient.assert_not_called()
+
+            # validated — AI MUST be called
+            generate_fix(
+                _minimal_finding(),
+                {"status": "validated", "confidence": 0.95, "reason": "Test failed."},
+                _minimal_context(),
+            )
+            MockClient.assert_called_once()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 7D — Regression runner: no_regression_tests + fix_verified guard
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestNoRegressionTests(unittest.TestCase):
+    """
+    Task 7D: when pytest exit code 5 (no tests collected), the regression
+    runner must return status 'no_regression_tests'. The fix agent must
+    then NOT return 'fix_verified' — it must roll back and return
+    'no_regression_tests'.
+    """
+
+    BUGGY_SOURCE = "def divide(a, b):\n    return a / b\n"
+    ORIGINAL = "    return a / b"
+    FIXED = "    if b == 0:\n        return None\n    return a / b"
+
+    def _run_with_regression_status(self, regression_status):
+        with _TempRepo() as repo:
+            repo.write("calc.py", self.BUGGY_SOURCE)
+
+            with patch("app.agents.fix_agent.AIClient") as MockClient, \
+                 patch("app.agents.fix_agent.run_test") as mock_run, \
+                 patch("app.agents.fix_agent.run_regression_tests") as mock_reg:
+
+                instance = MagicMock()
+                instance.generate.return_value = _good_fix_response(
+                    original=self.ORIGINAL, fixed=self.FIXED
+                )
+                MockClient.return_value = instance
+
+                mock_run.return_value = {
+                    "status": "passed", "return_code": 0, "stdout": "", "stderr": "",
+                }
+                mock_reg.return_value = {
+                    "status": regression_status, "return_code": 5, "stdout": "", "stderr": "",
+                }
+
+                result = generate_fix(
+                    _minimal_finding(),
+                    {"status": "validated", "confidence": 0.95, "reason": "Test failed."},
+                    _minimal_context(),
+                    test={"test_code": "def test_x(): pass"},
+                    execution={"status": "failed", "stdout": "", "stderr": ""},
+                    repository_path=repo.path,
+                )
+
+            return result, repo
+
+    def test_regression_returncode_5_gives_no_regression_tests_from_runner(self):
+        """The regression runner must return 'no_regression_tests' for exit 5."""
+        from app.executor.regression_runner import run_regression_tests
+        from unittest.mock import patch as _patch
+        import subprocess as _subprocess
+
+        with _TempRepo() as repo:
+            mock_result = MagicMock()
+            mock_result.returncode = 5
+            mock_result.stdout = "no tests ran"
+            mock_result.stderr = ""
+
+            with _patch("app.executor.regression_runner.subprocess.run",
+                        return_value=mock_result):
+                result = run_regression_tests(repo.path)
+
+        self.assertEqual(result["status"], "no_regression_tests")
+        self.assertEqual(result["return_code"], 5)
+
+    def test_no_regression_tests_gives_no_regression_tests_status(self):
+        """fix agent must NOT return fix_verified when no regression tests exist."""
+        result, _ = self._run_with_regression_status("no_regression_tests")
+        self.assertEqual(result["status"], "no_regression_tests",
+                         f"Expected no_regression_tests, got {result['status']}")
+
+    def test_no_regression_tests_triggers_rollback(self):
+        """Source file must be rolled back when there are no regression tests."""
+        with _TempRepo() as repo:
+            repo.write("calc.py", self.BUGGY_SOURCE)
+
+            with patch("app.agents.fix_agent.AIClient") as MockClient, \
+                 patch("app.agents.fix_agent.run_test") as mock_run, \
+                 patch("app.agents.fix_agent.run_regression_tests") as mock_reg:
+
+                instance = MagicMock()
+                instance.generate.return_value = _good_fix_response(
+                    original=self.ORIGINAL, fixed=self.FIXED
+                )
+                MockClient.return_value = instance
+
+                mock_run.return_value = {
+                    "status": "passed", "return_code": 0, "stdout": "", "stderr": "",
+                }
+                mock_reg.return_value = {
+                    "status": "no_regression_tests", "return_code": 5,
+                    "stdout": "", "stderr": "",
+                }
+
+                generate_fix(
+                    _minimal_finding(),
+                    {"status": "validated", "confidence": 0.95, "reason": "Test failed."},
+                    _minimal_context(),
+                    test={"test_code": "def test_x(): pass"},
+                    execution={"status": "failed", "stdout": "", "stderr": ""},
+                    repository_path=repo.path,
+                )
+
+            # File must be restored to original (rollback happened)
+            with open(os.path.join(repo.path, "calc.py")) as fh:
+                content = fh.read()
+
+        self.assertEqual(content, self.BUGGY_SOURCE,
+                         "File was not rolled back after no_regression_tests.")
+
+    def test_fix_verified_requires_regression_tests_to_pass(self):
+        """fix_verified must only be returned when regression status is 'passed'."""
+        from app.agents.fix_agent import generate_fix as _gf
+
+        for bad_status in ("no_regression_tests", "failed", "timeout", "error"):
+            with self.subTest(regression_status=bad_status):
+                with _TempRepo() as repo:
+                    repo.write("calc.py", self.BUGGY_SOURCE)
+
+                    with patch("app.agents.fix_agent.AIClient") as MockClient, \
+                         patch("app.agents.fix_agent.run_test") as mock_run, \
+                         patch("app.agents.fix_agent.run_regression_tests") as mock_reg:
+
+                        instance = MagicMock()
+                        instance.generate.return_value = _good_fix_response(
+                            original=self.ORIGINAL, fixed=self.FIXED
+                        )
+                        MockClient.return_value = instance
+                        mock_run.return_value = {
+                            "status": "passed", "return_code": 0, "stdout": "", "stderr": "",
+                        }
+                        mock_reg.return_value = {
+                            "status": bad_status, "return_code": 1,
+                            "stdout": "", "stderr": "",
+                        }
+
+                        result = _gf(
+                            _minimal_finding(),
+                            {"status": "validated", "confidence": 0.95, "reason": "Test failed."},
+                            _minimal_context(),
+                            test={"test_code": "def test_x(): pass"},
+                            execution={"status": "failed", "stdout": "", "stderr": ""},
+                            repository_path=repo.path,
+                        )
+
+                    self.assertNotEqual(result["status"], "fix_verified",
+                                        f"fix_verified must not be returned when "
+                                        f"regression_status == '{bad_status}'")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 

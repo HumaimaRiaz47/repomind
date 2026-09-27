@@ -271,7 +271,8 @@ def generate_fix(
 
     Returns a dict with:
         status  — "not_applicable" | "proposed" | "applied" | "fix_verified"
-                  | "fix_failed" | "regression_failed" | "needs_review" | "error"
+                  | "fix_failed" | "regression_failed" | "no_regression_tests"
+                  | "needs_review" | "error"
         ...     — additional fields describing the fix and its outcome
     """
 
@@ -356,12 +357,19 @@ def generate_fix(
     regression_status = regression.get("status")
 
     if repro_status == "passed" and regression_status == "passed":
+        # Both the reproduction test and regression suite pass — fix is safe.
         fix_status = "fix_verified"
     elif repro_status != "passed":
         # Reproduction test still fails — fix did not resolve the issue.
         # Rollback the patch so the repo is clean for retries.
         _rollback_patch(patch_result, repository_path)
         fix_status = "fix_failed"
+    elif regression_status == "no_regression_tests":
+        # Repro passed but no existing regression tests exist to validate
+        # against — we cannot confirm the fix is regression-safe.
+        # Rollback to preserve a clean state.
+        _rollback_patch(patch_result, repository_path)
+        fix_status = "no_regression_tests"
     elif regression_status != "passed":
         # Repro passed but regression broke — fix introduces a regression.
         # Rollback to preserve a clean state.

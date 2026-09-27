@@ -47,7 +47,7 @@ export function FinalReport({ report, fixedFindingIds, onReset }: FinalReportPro
           <ul className="flex flex-col gap-2">
             {report.findings.map((f) => {
               const wasFixed = fixedFindingIds.includes(f.id)
-              const wasRejected = f.id === 'f4'
+              const wasRejected = f.status === 'rejected'
               const label = wasFixed ? 'Fixed' : wasRejected ? 'Rejected' : 'Validated'
               const style = wasFixed
                 ? 'bg-ok-50 text-ok-700 border-ok-500/30'
