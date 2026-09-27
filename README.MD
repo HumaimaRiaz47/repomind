@@ -80,7 +80,7 @@ This makes execution a central part of the AI software-engineering loop.
 >
 > Suggested file:
 >
- ![RepoMind Architecture](docs/repomind.svg)
+ ![RepoMind Architecture](docs/repomind.png)
 
 
 ---
@@ -198,11 +198,8 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 > **📸 Add screenshot here**
 >
-> `docs/UI/1.png`
+![RepoMind Dashboard](docs/UI/1.png)
 
-<!--
-![RepoMind Dashboard](docs/screenshots/dashboard.png)
--->
 
 ---
 
@@ -210,11 +207,7 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 > **📸 Add screenshot here**
 >
-> `docs/UI/2.png`
-
-<!--
-![Repository Analysis](docs/screenshots/analysis.png)
--->
+![Repository Analysis](docs/UI/2.png)
 
 ---
 
@@ -222,13 +215,10 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 > **📸 Add screenshot here**
 >
-> `docs/UI/3.png`
-> `docs/UI/4.png`
+![Test Evidence](docs/UI/3.png)
+![Test Evidence](docs/UI/4.png)
 
 
-<!--
-![Test Evidence](docs/screenshots/evidence.png)
--->
 
 ---
 
@@ -236,13 +226,10 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 > **📸 Add screenshot here**
 >
-> `docs/UI/5.png`
-> `docs/UI/6.png`
+![Fix Agent](docs/UI/5.png)
+![Fix Agent](docs/UI/6.png)
 
 
-<!--
-![Fix Agent](docs/screenshots/fix.png)
--->
 
 ---
 
@@ -250,12 +237,7 @@ This creates a feedback loop between AI reasoning and actual software behavior.
 
 > **📸 Add screenshot here**
 >
-> `docs/UI/7.png`
-
-<!--
-![Final Report](docs/screenshots/final-report.png)
--->
-
+![Final Report](docs/UI/7.png)
 ---
 
 # 🧰 Technology Stack
